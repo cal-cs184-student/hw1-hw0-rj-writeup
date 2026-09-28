@@ -109,7 +109,63 @@
 		These results make sense because test 4 is only 5 triangles, so there's a limited speedup. However, for the other tests with shapes split into many more triangles, skipping the empty parts of each box is very helpful. That is where this optimization works best: lots of smaller triangles that have lots of empty space in their bounding boxes.
 		
 		<h2>Task 2: Antialiasing by Supersampling</h2>
-		Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+		<h4>Supersampling Algorithm + Data Structures</h4>
+		The edge of a triangle has a higher frequency than any sampling rate, as it is a step in coverage (the color goes from triangle -> background or vice versa all at once). So, the previous sample rate of one point per piel was below the Nyquist rate for that signal, which can result in spatial aliasing (showing up as jaggies or staircasing). On a triangle that is thinner than a pixel, we observe topological dropout if the pixel center (the single sampled point) misses the triangle. This can result in gaps of background even if the triangle technically exists at that point. This can be seen in the above screenshot.
+		<br> <br>
+		The solution to this problem is supersampling, which increases the sampling rate inside of the pixel. Then, the multiple samples can be reduced to a single display color per pixel using a prefilter.
+		Prefiltering on the finer samples is needed (instead of a simpler solution like, say, blurring), otherwise we will not be able to handle topological dropout because that color is already lost & stored as the background. 
+		<br>
+		The result of this approach is still three 8-bit RGB values per pixel. The extra samples are stored in a separate <code>sample_buffer</code>, which is a vector of length <code>width * height * sample_rate</code>.
+		<code>Color</code> stores r, g, and b values as floats in the range [0, 1]. Each pixel (x, y) has a continguous block of <code>sample_rate</code> entries, which starts at <code>(y * width + x) * sample_rate</code> in the sample buffer.
+		<br> <br>
+		The <code>-</code> and <code>=</code> keys control the <code>sample_rate</code> (setting it to values 1, 4, 9, and 16). We set N to 1, 2, 3, 4 (<code>N = sqrt(sample_rate)</code>). Then, we subsample <code>(i, j)</code>, where the column is <code>i</code> and the row is <code>j</code>. The point corresponding to that subsample is designed to be the center of the cell it is allotted. For instance, if <code>sample_rate</code> is 4, we split the cell into 4 cells, and the 4 sampled points within the pixel are the centers of the lower right, lower left, upper right, and upper left quadrants.
+		Mathematically, this amounts t: \[s_x = x + \frac{i + 0.5}{N}, \qquad s_y = y + \frac{j + 0.5}{N}\]
+		This follows the same "center" approach of the all-or-nothing algorithm, but just partitions the grid.
+		<br> <br>
+		Overall, this led to a few changes to the rasterization pipelines.
+		First, the buffer is allocated in three places, all to <code>width * height * sample_rate</code> and filled white: the constructor, <code>set_sample_rate</code> (for <code>-</code> or <code>=</code> keypress), and <code>set_framebuffer_target</code> (for window resize). <code>clear_buffers</code> fills the whole buffer white at the start of every frame.
+		Next, triangles don't write the framebuffer themselves. <code>rasterize_triangle</code> still builds the bounding box and uses the naive line test algorithm, but now does it for multiple points instead of just <code>(x+0.5, y+0.5)</code>, and then calls <code>shade_pixel</code> which writes the triangle color into the one slot for that point when the sample is inside. If the point is not in the triangle, the slot is left as the default white value.
+		Note that setting <code>sampling_rate > 1</code> will default to the naive (slower) pipeline.
+		<code>fill_pixel</code> ensures that points and lines are not antialiased, so they are all written with the same color.
+		<code>resolve_to_framebuffer</code> is the filter, so it sums all the colors across all the sampled pixels and gets the average color for the overall pixel. It then writes this value into the 8-bit framebuffer, setting the overall display color for the pixel.
+
+		<h4>Example Render: Test 4</h4>
+		All three images are <code>basic/test4.svg</code> at the default view with the pixel inspector on the same region. The region of interest is the right tapering corner near the border of the red triangle.
+		<table style="width:100%; border-collapse:collapse;">
+		<tr>
+		<td colspan="2" style="padding:18px 0 8px 0; border-bottom:1px solid #e5e5e5;">1 sample per pixel</td>
+		</tr>
+		<tr>
+		<td style="width:68%; padding:12px 16px 8px 0; vertical-align:top;">
+		<img src="assets/test4-rate1.png" alt="test4 at 1 sample per pixel" style="width:100%; display:block;"/>
+		</td>
+		<td style="padding:12px 0 8px 8px; vertical-align:top;">
+		At 1 sample, the red corner experiences the same broken staircase (jaggies), and each pixel is either fully red or fully white. The triangle becomes so thin (sub-pixel length), so if the triangle doesn't hit the pixel center, it is dropped to white, creating the breakage. This is what makes the sampling look choppy and pixelated. Note that the black edge is still sharp because it does not take in this new logic (we keep <code>fill_pixel</code> separate).
+		</td>
+		</tr>
+		<tr>
+		<td colspan="2" style="padding:28px 0 8px 0; border-bottom:1px solid #e5e5e5;">4 samples per pixel</td>
+		</tr>
+		<tr>
+		<td style="width:68%; padding:12px 16px 8px 0; vertical-align:top;">
+		<img src="assets/test4-rate4.png" alt="test4 at 4 samples per pixel" style="width:100%; display:block;"/>
+		</td>
+		<td style="padding:12px 0 8px 8px; vertical-align:top;">
+		At 4 samples, we take a sample in each quadrant of each pixel. Now, there are some lighter red/pinkish pixels where one of those 4 centers lands inside the triangle (with the intensity of pink/red depending on how many of those centers landed inside the triangle). This helps the triangle appear closer to a continuous thin shape (although still not perfect, it looks better than sample rate = 1). Again, the border is intact.
+		</td>
+		</tr>
+		<tr>
+		<td colspan="2" style="padding:28px 0 8px 0; border-bottom:1px solid #e5e5e5;">16 samples per pixel</td>
+		</tr>
+		<tr>
+		<td style="width:68%; padding:12px 16px 8px 0; vertical-align:top;">
+		<img src="assets/test4-rate16.png" alt="test4 at 16 samples per pixel" style="width:100%; display:block;"/>
+		</td>
+		<td style="padding:12px 0 8px 8px; vertical-align:top;">
+		Finally, at 16 samples, the same corner is a much smoother ramp, and there are more types/shades of observed colors between red and white. Pixels that only barely touch the triangle will get just a few red subsamples, giving it a very light pinkish color, whereas pixels that are very much in the triangle (but still not fully) are closer to actual red. The tip looks like its fading out instead of ending on a hard pixel. There is still some staircasing, but overall it looks a lot smoother than 1-point and 4-point samples.
+		</td>
+		</tr>
+		</table>
 
 		<h2>Task 3: Transforms</h2>
 		Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.

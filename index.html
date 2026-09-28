@@ -28,56 +28,85 @@
 	<body>
 		<div class="container">
 		<h1>CS184/284A Fall 2026 Homework 1 Write-Up</h1>
-		<div style="text-align: center;">Names: </div>
+		<div style="text-align: center;">Names: Ria Jain</div>
 
 		<br>
 
-		Link to webpage: (TODO) <a href="https://cs184.eecs.berkeley.edu/fa26">cs184.eecs.berkeley.edu/fa26</a>
+		Link to webpage: <a href="https://cal-cs184-student.github.io/hw1-hw0-rj-writeup/">cal-cs184-student.github.io/hw1-hw0-rj-writeup</a>
 		
 		<br>
 
-		Link to GitHub repository: (TODO) <a href="https://cs184.eecs.berkeley.edu/fa26">cs184.eecs.berkeley.edu/fa26</a>
-
-		<figure>
-			<img src="assets/lion.jpg" alt="Lion" style="width:50%"/>
-			<figcaption>You can add images with captions!</figcaption>
-		</figure>
+		Link to GitHub repository: <a href="https://github.com/cal-cs184-student/hw1-hw0-rj">github.com/cal-cs184-student/hw1-hw0-rj</a>
 
 		<!--
 		We've already added one heading per task, to make your write-up as navigable when grading. Please fit your write-up within these sections!
 		-->
 
-		<h2>Overview</h2>
+		<h2>[TODO] Overview</h2>
 		Give a high-level overview of what you implemented in this homework. Think about what you've built as a whole. Share your thoughts on what interesting things you've learned from completing the homework.
+		<figure>
+			<img src="assets/lion.jpg" alt="Lion" style="width:50%"/>
+			<figcaption>You can add images with captions!</figcaption>
+		</figure>
 
 		<h2>Task 1: Drawing Single-Color Triangles</h2>
-		Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
 
-		<p>Here is an example 2x2 gridlike structure using an HTML table. Each <b>tr</b> is a row and each <b>td</b> is a column in that row. You might find this useful for framing and showing your result images in an organized fashion.</p>
-		<div style="display: flex; flex-direction: column; align-items: center;">
-			<table style="width: 100%; text-align: center; border-collapse: collapse;">
-			  <tr>
-				<td style="text-align: center;">
-				  <img src="assets/lion.jpg" width="400px"/>
-				  <figcaption>Caption goes here.</figcaption>
-				</td>
-				<td style="text-align: center;">
-				  <img src="assets/lion.jpg" width="400px"/>
-				  <figcaption>Caption goes here.</figcaption>
-				</td>
-			  </tr>
-			  <tr>
-				<td style="text-align: center;">
-				  <img src="assets/lion.jpg" width="400px"/>
-				  <figcaption>Caption goes here.</figcaption>
-				</td>
-				<td style="text-align: center;">
-				  <img src="assets/lion.jpg" width="400px"/>
-				  <figcaption>Caption goes here.</figcaption>
-				</td>
-			  </tr>
-			</table>
-		</div>
+		<h4>Rasterizing a Triangle</h4>
+		To rasterize a triangle, which means deciding which pixels that triangle covers, we do the following: each pixel (x, y) covers [x, x+1) x [y, y+1). We test just one point in this pixel -- the centerpoint: (x + 0.5, y + 0.5). This is to avoid the asymmetries that can come up if we decided to sampled a corner point of the pixel instead.
+		We perform the line test on each edge of the triangle. An edge is given by the tangent vector between any 2 vertices of the triangle. We can rotate the tangent by 90 degrees to get the normal. The line test takes the dot product of that normal with the vector from the vertex to the sample point.
+		The sign of the dot product tells us which side of that edge the point is on (or if it lies on the edge). If a point is on the inside of all 3 half planes (that make up the triangle), the point is inside the triangle.
+		To allow for both CCW triangles and CW triangles, we essentially check if the dot products are all three negative or all three positive. This implementation does not use the OpenGL edge rules for when the dot product is zero. We count L = 0 as inside.
+		We run this for all pixels inside the triangle's bounding box. If the center of the pixel is inside the triangle, we use all-or-nothing sampling so the entire pixel gets that triangle's color.
+
+		<h4>Performance</h4>
+		This algorithm already computes the bounding box, meaning it finds the smallest rectangle that fully contains the triangle. Every sampled pixel point has to be inside this bounding box.
+		Thus, we never test pixels outside the bounding box, and so this implementation cannot be worse than one that checks every sample within the bounding box. We only search over that range.
+
+		<h4>Example Render: Test 4</h4>
+		<img src="Assets/test4.png" width="500px"/> <br>
+		Here, we show an interesting consequence of using all-or-nothing, single-point pixel sampling: jaggies (a staircase-like pattern along the triangle's edges), which is a form of spatial aliasing. This is because we only sample one point in the pixel.
+		Another interesting slimitation is the pink triangle, which suffers from topological dropouts (another result of insufficient sampling).
+
+		<h4>Extra Credit Optimizations</h4>
+		In addition to the basic version, which performs the 3 edge tests at the sampled pixel points (as described above), there is a faster version of this code which has 2 main optimizations.
+		The first is using scanline traversal, in which we go row by row instead of over the entire bounding box. For each row, we want to find where the 3 edges cross that row to get a refined horizontal range over which that triangle exists. The second optimization is that we extract shared logic/computation as much as possible. For instance, we used a refined dot product implementation that only takes in the pixel (x, y) and avoids edge-specific recomputation. When iterating over a row, we also compute certain row-wide values outside of the loop as much as possible. New algorithm: compute edge-specific values/coefficients. Then, we perform the line test for vertex 2 and edge 0, which tells 2 things: (1) if the triangle is a line (because all vertices are collinear), in which case we can just do the naive method as this optimization doesn't work, and (2) the direction of the triangle (CW or CCW).
+		Then, iterate over all rows. Go through each edge and find the x at which the edge intersects the row (at which point L = 0). Then, based on the direction of the triangle, determine if this is a left or right bound, and adjust the horizontal bounds. Finally, once the row has a refined horizontal range, test every pixel in that range and fill color accordingly.
+		<br> <br>
+		Results:
+		<br>
+		<table style="width:100%; border-collapse:collapse; text-align:left;">
+		<tr>
+			<th style="border-bottom:1px solid #ccc; padding:6px;">Scene</th>
+			<th style="border-bottom:1px solid #ccc; padding:6px;">Resolution</th>
+			<th style="border-bottom:1px solid #ccc; padding:6px;">Bounding-box loop</th>
+			<th style="border-bottom:1px solid #ccc; padding:6px;">Fast span</th>
+		</tr>
+		<tr>
+			<td style="padding:6px;"><code>basic/test4.svg</code></td>
+			<td style="padding:6px;">800&times;600</td>
+			<td style="padding:6px;">0.14 ms</td>
+			<td style="padding:6px;">0.09 ms</td>
+		</tr>
+		<tr>
+			<td style="padding:6px;"><code>basic/test3.svg</code></td>
+			<td style="padding:6px;">800&times;600</td>
+			<td style="padding:6px;">5.97 ms</td>
+			<td style="padding:6px;">3.71 ms</td>
+		</tr>
+		<tr>
+			<td style="padding:6px;"><code>subdiv/triangle7.svg</code></td>
+			<td style="padding:6px;">1024&times;1024</td>
+			<td style="padding:6px;">3.35 ms</td>
+			<td style="padding:6px;">0.57 ms</td>
+		</tr>
+		<tr>
+			<td style="padding:6px;"><code>illustration/05_lion.svg</code></td>
+			<td style="padding:6px;">1024&times;1024</td>
+			<td style="padding:6px;">2.02 ms</td>
+			<td style="padding:6px;">0.94 ms</td>
+		</tr>
+		</table>
+		These results make sense because test 4 is only 5 triangles, so there's a limited speedup. However, for the other tests with shapes split into many more triangles, skipping the empty parts of each box is very helpful. That is where this optimization works best: lots of smaller triangles that have lots of empty space in their bounding boxes.
 		
 		<h2>Task 2: Antialiasing by Supersampling</h2>
 		Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.

@@ -176,7 +176,19 @@
 		<img src="assets/my_robot.png" width="500px"/>
 
 		<h2>Task 4: Barycentric coordinates</h2>
-		Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+		<h4>Barycentric Coordinates</h4>
+		This is a convenient coordinate system for triangles. The idea is that any point inside of a triangle is a weighted mix of the 3 vertices of the triangle: <code>(x, y) = akpha * A + beta * B + gamma * C</code>, where <code>alpha + beta + gamma = 1</code>. The <code>alpha</code>, <code>beta</code>, and <code>gamma</code> values can be seen as weights on the various vertices of the triangle, A, B, and C. At the vertices, exactly one of these weights will be 1 (and the other two will necessarily be 0). A sample is inside the triangle if all weights are > 0. A sample is on an edge if exactly one of the weights is 0. At the centroid, each weight is exactly 1/3.
+		The weights come from the same half-plane logic as the prior rasterization logic. The value of L(x, y) on the edge across a vertex will be 0 along the edge, and when (x, y) = that vertext, L(x, y) = twice the signed area of the entire triangle. Dividing through by that area makes the weight 1 at the vertex. The factor of two is in both the numerator and the denominator, so it cancels, and the weight is just the fraction of the triangle on that vertex's side. Dividing by the signed area also keeps the weights positive for both windings.
+		<br> <br>
+		This system is also very convenient for assigning pixel colors for when vertices are not all the same color. The pixel color uses those same weights on the vertex colors: <code>V = alpha * V_A + beta * V_B + gamma * V_C</code>. The following is an example in which A is red, B is green, and C is blue. Each corner is that pure color. Moving away from a corner fades its color out. The middle is grey, because the weights are all 1/3 so it will mix equal parts red, green, and blue:
+		<br><br>
+		<img src="assets/rgb_triangle.png" width="400px"/>
+		<h4>Exaple Render: Test 7</h4>
+		The following color wheel is made up of a bunch of thin triangles that all share the black center vertex. Each outer edge has its own pair of colors. The wheel is filled in using barycentric interpolation.
+		The center is black because each triangle slice has full weight on that shared vertex. Then, the outer rim is rainbow because the outer weights change from slice to slice.
+		<br><br>
+		<img src="assets/test7.png" width="400px"/>
+		<br>
 
 		<h2>Task 5: "Pixel sampling" for texture mapping</h2>
 		Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.

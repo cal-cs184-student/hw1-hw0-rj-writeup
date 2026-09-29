@@ -63,7 +63,7 @@
 		Thus, we never test pixels outside the bounding box, and so this implementation cannot be worse than one that checks every sample within the bounding box. We only search over that range.
 
 		<h4>Example Render: Test 4</h4>
-		<img src="Assets/test4.png" width="500px"/> <br>
+		<img src="assets/test4.png" width="500px"/> <br>
 		Here, we show an interesting consequence of using all-or-nothing, single-point pixel sampling: jaggies (a staircase-like pattern along the triangle's edges), which is a form of spatial aliasing. This is because we only sample one point in the pixel.
 		Another interesting slimitation is the pink triangle, which suffers from topological dropouts (another result of insufficient sampling).
 
@@ -168,7 +168,12 @@
 		</table>
 
 		<h2>Task 3: Transforms</h2>
-		Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+		<h4>Cubeman Running Transform</h4>
+		To make the cubeman from the original <code>robot.svg</code>, we kept the torso and the inner arms the same. I also kept the global transforms and existing transforms (like resizes) the same. There were 4 main changes: make the outer right arm swing up, the outer left arm swing down, the right leg run forward, and the left leg flick back. These were all achieved using the rotation and translation transforms.
+		In particular, to the make the outer arms swing up/down, after the existing scale, I rotated the two triangles making the outer arm updown by 90 degrees and adjusted the translations accordingly to make the arm line up nicely.
+		To make the legs, I rotated the upper legs by 45 degrees (inward and outward) and adjusted transforms accordingly. Then, I rotated the lower legs by 45 degrees in the opposite direction w.r.t the upper leg to create the running effect, and then adjusted transforms to make them look like legs.
+		<br>
+		<img src="assets/my_robot.png" width="500px"/>
 
 		<h2>Task 4: Barycentric coordinates</h2>
 		Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.

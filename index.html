@@ -227,7 +227,47 @@
 		At 16 samples, the two filters look a lot more similar to each other. Supersampling already takes several (u, v) locations inside the pixel and average them, so a nearest-sampled pixel picks up more than one texel and helps start to break up some of the hard squares that was previously observed. Bilinear already started to blend inside the pixel, so the distinction is less obvious and the extra samples just help further smooth out silhouettes and distinguishing lines.
 
 		<h2>Task 6: "Level Sampling" with mipmaps for texture mapping</h2>
-		Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+		<h4>Level Sampling</h4>
+		The old approach always read the full-resolution image. That is what we want to do when the view is zoomed in so that a single texel covers many pixels. However, when we zoom out and one pixel covers a bunch of the image texels, nearest or bilinear sampling will only read 1 or 4 (respectively) of the texels. This will skip over a bunch of the intermediate texels also covered by that pixel, resulting in a bunch of choppy high-frequency details coming out, which is what we don't want.
+		<br> <br>
+		A mipmap is a pyramid of copies of the original image. Level 0 of the pyramid is the original. Each level up from level 0 is the previous level averaged down to exactly half the dimensions (half width and half height), leading to an image that is the quarter of the size of one level down. In total, the chain costs about an extra one-third of memory to store texture information (because 1/4 + 1/16 + 1/64 + ... = 1/3). This is constructed one time by the generate_mips function, and it is done beforehand.
+		<br> <br>
+		The level of the pyramid that we actually goes with comes from the pixel footprint. For a sampled screen point (sx, sy), barycentric interpolation gives (u, v). Then, interpolating at (sx + 1, sy) gives the (u, v) coordinates for the screen pixel to the right, and interpolating at (sx, sy + 1) gives cootdinates for the screen pixel right below. We then take the difference and scale them by the full-resolution width and height, which turns them into texel units. L is set as the longer of them (how many level-0 texels the pixel covers). The continuous level is <code>D = log2(L)</code>.  If L = 1, this meads D = 0 (the original algorithm).
+		<br> <br>
+		Implementation details: <code>level zero</code> ignores <code>D</code> and reads level 0. <code>nearest level</code> rounds <code>D</code> to the closest integer mip and reads the one image corresponding to it. <code>bilinear level interpolation</code> blends the mips on either side of <code>D</code>. With bilinear pixel sampling, each of those lookups is itself a blend of the 4 texels, and then the last step blends the two mip colors together using linear interpolation.
+		<h4>Speed, Memory, and Antialiasing</h4>
+		Pixel filtering, level sampling, and supersampling all remove different kinds of aliasing. They have different tradeoffs:
+		<br> <br>
+		Pixel filtering: there are 2 methods - nearest and bilinear. Nearest will just read 1 texel. Bilinear will read 4 texels and linearly interpolate them. Neither requires extra memory for texture information, which is a plus. Bilinear tends to do well with antialiasing when a single texel stretches across a bunch of pixels, having multiple lookups helps fill stuff in. However, when pixels cover many texels, 4 lookups is still too small and so aliasing can still be very prominent.
+		<br> <br>
+		Level sampling: there is a memory cost of having to store the mip chain (as aforementioned, takes up an extra third). Nearest-level sample just looks at one texel in a smaller image, making it cheaper. More complexity comes with having to do 2 bilinear lookups, 8 texels, and then linearly interpolate between them. However, this blending helps a lot with abrupt changes and can therefore be really good for resolving aliasing. 
+		<br> <br>
+		Subersampling: this is the sample rate: 1, 4, 9, 16, etc. samples per pixels. The memory cost of this is having to store all the information in the sample buffer. Every sample also has to do a texture lookup, which can be computationally expensive. However, increasing the sampling rate is a great way to combat antialiasting and it can soften harsh patterns that are undesirable in a render.
+		<h4>Example render</h4>
+		The below 4 images are the same view of the chosen texture, an image of a book page, at 1 sample per pixel, zoomed out so that one pixel covers many texels. The pixel inspector is on a detailed region of text. <code>level zero</code> with nearest is the sparkliest. <code>level zero</code> with bilinear softens each lookup but the fine detail still suffers from aliasing. <code>nearest level</code> with either pixel filter is blurrier and the sparkle drops, because the pixel reads a mip whose texels are about the size of the pixel. Bilinear inside that mip smooths the remaining texel edges, as can be seen below.
+		<br><br>
+		<table style="width:100%; border-collapse:collapse;">
+		<tr>
+		<td style="width:50%; padding:8px; vertical-align:top;">
+		<img src="assets/task6-lzero-nearest.png" style="width:100%;"/>
+		<br>Level zero, nearest pixel
+		</td>
+		<td style="width:50%; padding:8px; vertical-align:top;">
+		<img src="assets/task6-lzero-bilinear.png" style="width:100%;"/>
+		<br>Level zero, bilinear pixel
+		</td>
+		</tr>
+		<tr>
+		<td style="width:50%; padding:8px; vertical-align:top;">
+		<img src="assets/task6-lnearest-nearest.png" style="width:100%;"/>
+		<br>Nearest level, nearest pixel
+		</td>
+		<td style="width:50%; padding:8px; vertical-align:top;">
+		<img src="assets/task6-lnearest-bilinear.png" style="width:100%;"/>
+		<br>Nearest level, bilinear pixel
+		</td>
+		</tr>
+		</table>
 
 		</div>
 	</body>
